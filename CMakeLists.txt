@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.5)
 project(rtabmap_ros)
 
+set(ROS_DISTRO "$ENV{ROS_DISTRO}")
+message(STATUS "ROS_DISTRO is ${ROS_DISTRO}")
+add_compile_definitions(ROS_DISTRO=${ROS_DISTRO})
+
 # Default to C99
 if(NOT CMAKE_C_STANDARD)
   set(CMAKE_C_STANDARD 99)
@@ -47,6 +51,7 @@ find_package(class_loader REQUIRED)
 #find_package(rosgraph_msgs REQUIRED)
 find_package(image_geometry REQUIRED)
 #find_package(pluginlib REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 
 # Optional components
 #find_package(costmap_2d)
@@ -223,12 +228,14 @@ SET(Libraries
    tf2
    tf2_eigen
    tf2_ros
+   tf2_geometry_msgs
    laser_geometry
    message_filters
    class_loader
    visualization_msgs
    image_geometry
    stereo_msgs
+   std_srvs
 )
 
 SET(rtabmap_sync_lib_src
@@ -335,13 +342,19 @@ ament_target_dependencies(rtabmap_common ${Libraries})
 ament_target_dependencies(rtabmap_sync ${Libraries})
 ament_target_dependencies(rtabmap_plugins ${Libraries})
 
-target_link_libraries(rtabmap_common ${RTABMap_LIBRARIES})
-target_link_libraries(rtabmap_sync rtabmap_common ${RTABMap_LIBRARIES})
-target_link_libraries(rtabmap_plugins rtabmap_common ${RTABMap_LIBRARIES})
-
-rosidl_target_interfaces(rtabmap_common ${PROJECT_NAME} "rosidl_typesupport_cpp")
-rosidl_target_interfaces(rtabmap_sync ${PROJECT_NAME} "rosidl_typesupport_cpp")
-rosidl_target_interfaces(rtabmap_plugins ${PROJECT_NAME} "rosidl_typesupport_cpp")
+if(ROS_DISTRO STREQUAL "humble")
+  rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+  target_link_libraries(rtabmap_common "${cpp_typesupport_target}" ${RTABMap_LIBRARIES})
+  target_link_libraries(rtabmap_sync rtabmap_common "${cpp_typesupport_target}" ${RTABMap_LIBRARIES})
+  target_link_libraries(rtabmap_plugins rtabmap_common "${cpp_typesupport_target}" ${RTABMap_LIBRARIES})
+else()
+  rosidl_target_interfaces(rtabmap_common ${PROJECT_NAME} "rosidl_typesupport_cpp")
+  rosidl_target_interfaces(rtabmap_sync ${PROJECT_NAME} "rosidl_typesupport_cpp")
+  rosidl_target_interfaces(rtabmap_plugins ${PROJECT_NAME} "rosidl_typesupport_cpp")
+  target_link_libraries(rtabmap_common ${RTABMap_LIBRARIES})
+  target_link_libraries(rtabmap_sync rtabmap_common ${RTABMap_LIBRARIES})
+  target_link_libraries(rtabmap_plugins rtabmap_common ${RTABMap_LIBRARIES})
+endif()
 
 rclcpp_components_register_nodes(rtabmap_plugins "rtabmap_ros::RGBDOdometry")
 rclcpp_components_register_nodes(rtabmap_plugins "rtabmap_ros::StereoOdometry")
@@ -503,46 +516,89 @@ get_default_rmw_implementation(rmw_implementation)
 find_package("${rmw_implementation}" REQUIRED)
 get_rmw_typesupport(typesupport_impls "${rmw_implementation}" LANGUAGE "cpp")
 
-foreach(typesupport_impl ${typesupport_impls})
-  rosidl_target_interfaces(rtabmap_rgbd_odometry
+if(ROS_DISTRO STREQUAL "humble")
+  foreach(typesupport_impl ${typesupport_impls})
+  rosidl_get_typesupport_target(rtabmap_rgbd_odometry
     ${PROJECT_NAME} ${typesupport_impl}
   )
-  rosidl_target_interfaces(rtabmap_stereo_odometry
+  rosidl_get_typesupport_target(rtabmap_stereo_odometry
     ${PROJECT_NAME} ${typesupport_impl}
   )
-  rosidl_target_interfaces(rtabmap_icp_odometry
+  rosidl_get_typesupport_target(rtabmap_icp_odometry
     ${PROJECT_NAME} ${typesupport_impl}
   )
-  rosidl_target_interfaces(rtabmap_rgbd_relay
+  rosidl_get_typesupport_target(rtabmap_rgbd_relay
     ${PROJECT_NAME} ${typesupport_impl}
   )
-  rosidl_target_interfaces(rtabmap_rgbd_sync
+  rosidl_get_typesupport_target(rtabmap_rgbd_sync
     ${PROJECT_NAME} ${typesupport_impl}
   )
-  rosidl_target_interfaces(rtabmap_rgbdx_sync
+  rosidl_get_typesupport_target(rtabmap_rgbdx_sync
     ${PROJECT_NAME} ${typesupport_impl}
   )
-  rosidl_target_interfaces(rtabmap_rgb_sync
+  rosidl_get_typesupport_target(rtabmap_rgb_sync
     ${PROJECT_NAME} ${typesupport_impl}
   )
-  rosidl_target_interfaces(rtabmap_stereo_sync
+  rosidl_get_typesupport_target(rtabmap_stereo_sync
     ${PROJECT_NAME} ${typesupport_impl}
   )
-  rosidl_target_interfaces(rtabmap_pointcloud_to_depthimage
+  rosidl_get_typesupport_target(rtabmap_pointcloud_to_depthimage
     ${PROJECT_NAME} ${typesupport_impl}
   )
-  rosidl_target_interfaces(rtabmap_point_cloud_xyzrgb
+  rosidl_get_typesupport_target(rtabmap_point_cloud_xyzrgb
     ${PROJECT_NAME} ${typesupport_impl}
   )
-  rosidl_target_interfaces(rtabmap
+  rosidl_get_typesupport_target(rtabmap
     ${PROJECT_NAME} ${typesupport_impl}
   )
   IF(RTABMAP_GUI)
-    rosidl_target_interfaces(rtabmapviz
+    rosidl_get_typesupport_target(rtabmapviz
       ${PROJECT_NAME} ${typesupport_impl}
     )
   ENDIF()
-endforeach()
+  endforeach()
+else()
+  foreach(typesupport_impl ${typesupport_impls})
+    rosidl_target_interfaces(rtabmap_rgbd_odometry
+      ${PROJECT_NAME} ${typesupport_impl}
+    )
+    rosidl_target_interfaces(rtabmap_stereo_odometry
+      ${PROJECT_NAME} ${typesupport_impl}
+    )
+    rosidl_target_interfaces(rtabmap_icp_odometry
+      ${PROJECT_NAME} ${typesupport_impl}
+    )
+    rosidl_target_interfaces(rtabmap_rgbd_relay
+      ${PROJECT_NAME} ${typesupport_impl}
+    )
+    rosidl_target_interfaces(rtabmap_rgbd_sync
+      ${PROJECT_NAME} ${typesupport_impl}
+    )
+    rosidl_target_interfaces(rtabmap_rgbdx_sync
+      ${PROJECT_NAME} ${typesupport_impl}
+    )
+    rosidl_target_interfaces(rtabmap_rgb_sync
+      ${PROJECT_NAME} ${typesupport_impl}
+    )
+    rosidl_target_interfaces(rtabmap_stereo_sync
+      ${PROJECT_NAME} ${typesupport_impl}
+    )
+    rosidl_target_interfaces(rtabmap_pointcloud_to_depthimage
+      ${PROJECT_NAME} ${typesupport_impl}
+    )
+    rosidl_target_interfaces(rtabmap_point_cloud_xyzrgb
+      ${PROJECT_NAME} ${typesupport_impl}
+    )
+    rosidl_target_interfaces(rtabmap
+      ${PROJECT_NAME} ${typesupport_impl}
+    )
+    IF(RTABMAP_GUI)
+      rosidl_target_interfaces(rtabmapviz
+        ${PROJECT_NAME} ${typesupport_impl}
+      )
+    ENDIF()
+  endforeach()
+endif()
 
 # If rviz is found, add plugins
 IF(rviz_default_plugins_FOUND)
@@ -598,9 +654,15 @@ IF(rviz_default_plugins_FOUND)
     ENDIF(Qt5_FOUND)
 
     foreach(typesupport_impl ${typesupport_impls})
+    if(ROS_DISTRO STREQUAL "humble")
+    rosidl_get_typesupport_target(rtabmap_rviz_plugins
+      ${PROJECT_NAME} ${typesupport_impl}
+    )
+    else()
 	  rosidl_target_interfaces(rtabmap_rviz_plugins
 	    ${PROJECT_NAME} ${typesupport_impl}
 	  )
+    endif()
     endforeach()
     
     # Causes the visibility macros to use dllexport rather than dllimport,
